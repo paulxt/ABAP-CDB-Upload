@@ -1,0 +1,1061 @@
+REPORT 506 MESSAGE-ID zsd.
+************************************************************************
+* Description  : 客戶資料上傳與查詢CDB
+************************************************************************
+INCLUDE zrsdsd506top.
+INCLUDE zrsdsd506f99.
+***********************************************************************
+* INITIALIZATION
+***********************************************************************
+INITIALIZATION.
+   "預設值給user-id
+    SELECT bname parid parva FROM usr05 INTO CORRESPONDING FIELDS OF TABLE t_usr05
+      WHERE bname = sy-uname.
+
+    CLEAR wa_usr05.
+    READ TABLE t_usr05 INTO wa_usr05 WITH KEY parid = 'VKO'.
+    IF wa_usr05-parva IS NOT INITIAL.
+        p_vkorg = wa_usr05-parva.
+        p_vkorg2-low = wa_usr05-parva.
+        APPEND p_vkorg2.
+    ENDIF.
+
+    CLEAR wa_usr05.
+    READ TABLE t_usr05 INTO wa_usr05 WITH KEY parid = 'SPA'.
+    IF wa_usr05-parva IS NOT INITIAL.
+        p_spart-low = wa_usr05-parva.
+        APPEND p_spart.
+        p_spart2-low = wa_usr05-parva.
+        APPEND p_spart2.
+    ENDIF.
+
+***********************************************************************
+*AT SELECTION SCREEN
+***********************************************************************
+AT SELECTION-SCREEN OUTPUT.
+    IF p_upload = 'X'.
+        LOOP AT SCREEN.
+            IF screen-group1 = 'G1'.
+                screen-active = '1'.
+            ELSEIF screen-group1 = 'G2'.
+                screen-active = '0'.
+            ENDIF.
+            MODIFY SCREEN.
+        ENDLOOP.
+    ELSEIF p_search = 'X'.
+        LOOP AT SCREEN.
+            IF screen-group1 = 'G2'.
+                screen-active = '1'.
+            ELSEIF screen-group1 = 'G1'.
+                screen-active = '0'.
+            ENDIF.
+            MODIFY SCREEN.
+        ENDLOOP.
+    ENDIF.
+***********************************************************************
+* Start-of-selection PAUL
+***********************************************************************
+START-OF-SELECTION.
+    IF p_upload = 'X'.
+        IF p_vkorg IS INITIAL.
+            MESSAGE s999.
+        ELSE.
+          PERFORM read_data.
+        ENDIF.
+    ENDIF.
+***********************************************************************
+* End-of-selection PAUL
+***********************************************************************
+END-OF-SELECTION.
+    IF p_upload = 'X'.
+        IF t_print IS NOT INITIAL .
+            PERFORM connect.
+            PERFORM output_data.
+            PERFORM disconnect.
+        ELSE.
+            MESSAGE s999.
+        ENDIF.
+    ELSEIF p_search = 'X'.
+        PERFORM connect.
+        PERFORM access_data.
+        PERFORM disconnect.
+
+        PERFORM build_event.
+        PERFORM build_top_of_page_data.
+        PERFORM fieldcat_init USING t_fieldcat[] t_sortable.
+        PERFORM display_alv.
+
+    ENDIF.
+*&---------------------------------------------------------------------*
+*& Form read_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM read_data .
+  "確認權限
+    SELECT * FROM tvta INTO TABLE t_tvta
+        WHERE vkorg = p_vkorg AND spart IN p_spart.
+    LOOP AT t_tvta INTO wa_tvta.
+        AUTHORITY-CHECK OBJECT 'V_VBAK_VKO'
+                 ID 'VKORG' FIELD wa_tvta-vkorg
+                 ID 'VTWEG' FIELD wa_tvta-vtweg
+                 ID 'SPART' FIELD wa_tvta-spart
+                 ID 'ACTVT' DUMMY."FIELD '03'.
+        IF sy-subrc NE 0.
+            DELETE t_tvta.
+        ENDIF.
+    ENDLOOP.
+    IF t_tvta IS INITIAL.
+        STOP.
+    ENDIF.
+
+    SELECT * FROM zutm10 INTO TABLE t_zutm10.
+    READ TABLE t_zutm10 INTO wa_zutm10 WITH KEY sysvr = 'ZSD6A_LOG'.
+    IF wa_zutm10-alpvl = 'Y'.
+        PERFORM get_component_list USING 'WA_PRINT' CHANGING t_component[].
+    ENDIF.
+
+  "說明檔
+    SELECT ktokd txt30 INTO CORRESPONDING FIELDS OF TABLE t_t077x
+      FROM t077x WHERE spras = sy-langu.
+    SELECT bzirk bztxt INTO CORRESPONDING FIELDS OF TABLE t_t171t
+      FROM t171t WHERE spras = sy-langu.
+    SELECT kdgrp ktext INTO CORRESPONDING FIELDS OF TABLE t_t151t
+      FROM t151t WHERE spras = sy-langu.
+    SELECT vkbur bezei INTO CORRESPONDING FIELDS OF TABLE t_tvkbt
+      FROM tvkbt WHERE spras = sy-langu.
+
+   "抓外部系統AD帳號
+    SELECT a~objek c~atnam a~atwrt INTO CORRESPONDING FIELDS OF TABLE t_ausp
+      FROM ausp AS a
+      JOIN cabn AS c
+      ON a~atinn = c~atinn
+      WHERE c~atnam = 'Z_SD_BP_ID'.
+
+    "主資料
+    IF p_upload = 'X'.
+        SELECT a~ktokd a~kunnr a~stcd1 v~vkorg v~spart v~bzirk v~kdgrp v~vkbur v~zterm v~inco1 v~kalks v~waers
+          a~adrnr a~pstlz a~pstlz a~land1 a~telfx a~erdat v~konda v~pltyp v~zz1_psprice_csa AS psprice v~vtweg
+          v~kvgr1 v~kvgr2 v~kvgr3 v~kvgr4 v~kvgr5
+          INTO CORRESPONDING FIELDS OF TABLE t_print
+          FROM knvv AS v
+          JOIN kna1 AS a
+          ON a~kunnr = v~kunnr
+          WHERE v~vkorg = p_vkorg
+          AND v~spart IN p_spart
+          AND v~kunnr IN s_kunnr.
+    ENDIF.
+
+
+    IF t_print IS NOT INITIAL.
+        SELECT partner taxtype taxnum INTO CORRESPONDING FIELDS OF TABLE t_dfkkbptaxnum
+          FROM dfkkbptaxnum
+          FOR ALL ENTRIES IN t_print
+          WHERE partner = t_print-kunnr.
+    ENDIF.
+
+    IF t_print IS NOT INITIAL.
+        SELECT partner bu_sort1 bu_sort2 INTO CORRESPONDING FIELDS OF TABLE t_but000
+          FROM but000
+          FOR ALL ENTRIES IN t_print
+          WHERE partner = t_print-kunnr.
+    ENDIF.
+
+    "抓Change Log
+    IF t_print IS NOT INITIAL.
+        SELECT objectid udate utime INTO CORRESPONDING FIELDS OF TABLE t_cdhdr
+          FROM cdhdr
+          WHERE tcode = 'BP'.
+    ENDIF.
+
+    "只要抓最新的日期與時間
+    SORT t_cdhdr BY udate utime DESCENDING.
+    DELETE ADJACENT DUPLICATES FROM t_cdhdr COMPARING objectid.
+
+    IF t_print[] IS NOT INITIAL.
+        SELECT kunnr bukrs INTO CORRESPONDING FIELDS OF TABLE t_knb1
+          FROM knb1
+          FOR ALL ENTRIES IN t_print
+          WHERE kunnr = t_print-kunnr.
+    ENDIF.
+    IF t_print IS NOT INITIAL .
+        SELECT addrnumber smtp_addr INTO CORRESPONDING FIELDS OF TABLE t_adr6
+          FROM adr6
+          FOR ALL ENTRIES IN t_print
+          WHERE addrnumber = t_print-adrnr.
+    ENDIF.
+
+    IF t_print IS NOT INITIAL.
+        SELECT kunnr taxkd INTO CORRESPONDING FIELDS OF TABLE t_knvi
+          FROM knvi
+          FOR ALL ENTRIES IN t_print
+          WHERE kunnr = t_print-kunnr.
+    ENDIF.
+
+    IF  t_print IS NOT INITIAL.
+        SELECT addrnumber city1 street INTO CORRESPONDING FIELDS OF TABLE t_adrc
+          FROM adrc
+          FOR ALL ENTRIES IN t_print
+          WHERE addrnumber = t_print-adrnr.
+    ENDIF.
+
+    IF  t_print IS NOT INITIAL.
+        SELECT addrnumber tel_number tel_extens r3_user INTO CORRESPONDING FIELDS OF TABLE t_adr2
+          FROM adr2
+          FOR ALL ENTRIES IN t_print
+          WHERE addrnumber = t_print-adrnr.
+    ENDIF.
+
+    IF t_print IS NOT INITIAL.
+        SELECT kunnr name1 name2 INTO CORRESPONDING FIELDS OF TABLE t_kna1
+          FROM kna1
+          FOR ALL ENTRIES IN t_print
+          WHERE kunnr = t_print-kunnr.
+    ENDIF.
+
+    "地址結合
+    LOOP AT t_kna1 INTO wa_kna1.
+        CONCATENATE wa_kna1-name1 wa_kna1-name2 INTO wa_kna1-name1 SEPARATED BY space.
+    ENDLOOP.
+
+    PERFORM get_desc.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_desc
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_desc .
+    CLEAR: wa_print.
+    LOOP AT t_print INTO wa_print.
+
+        CLEAR wa_t077x.
+        READ TABLE t_t077x INTO wa_t077x WITH KEY ktokd = wa_print-ktokd.
+        wa_print-txt30 = wa_t077x-txt30.
+
+        CLEAR wa_knb1.
+        READ TABLE t_knb1 INTO wa_knb1 WITH KEY kunnr = wa_print-kunnr.
+        wa_print-bukrs = wa_knb1-bukrs.
+
+        CLEAR wa_knvi.
+        READ TABLE t_knvi INTO wa_knvi WITH KEY kunnr = wa_print-kunnr.
+        wa_print-taxkd = wa_knvi-taxkd.
+
+        CLEAR wa_adr6.
+        READ TABLE t_adr6 INTO wa_adr6 WITH KEY addrnumber = wa_print-adrnr.
+        wa_print-smtp_addr = wa_adr6-smtp_addr.
+
+        CLEAR wa_adrc.
+        READ TABLE t_adrc INTO wa_adrc WITH KEY addrnumber = wa_print-adrnr.
+        CONCATENATE wa_adrc-city1 wa_adrc-street INTO wa_print-addr SEPARATED BY space.
+
+        CLEAR wa_adr2.
+        READ TABLE t_adr2 INTO wa_adr2 WITH KEY addrnumber = wa_print-adrnr r3_user = '3'.
+        wa_print-tel_number2 = wa_adr2-tel_number.
+
+        CLEAR wa_adr2.
+        READ TABLE t_adr2 INTO wa_adr2 WITH KEY addrnumber = wa_print-adrnr r3_user = '1'.
+        wa_print-tel_number1 = wa_adr2-tel_number.
+        wa_print-tel_extens = wa_adr2-tel_extens.
+
+        CLEAR wa_t171t.
+        READ TABLE t_t171t INTO wa_t171t WITH KEY bzirk = wa_print-bzirk.
+        wa_print-bztxt = wa_t171t-bztxt.
+
+        CLEAR wa_t151t.
+        READ TABLE t_t151t INTO wa_t151t WITH KEY kdgrp = wa_print-kdgrp.
+        wa_print-ktext = wa_t151t-ktext.
+
+        CLEAR wa_tvkbt.
+        READ TABLE t_tvkbt INTO wa_tvkbt WITH KEY vkbur = wa_print-vkbur.
+        wa_print-bezei = wa_tvkbt-bezei.
+
+        CLEAR wa_kna1.
+        READ TABLE t_kna1 INTO wa_kna1 WITH KEY kunnr = wa_print-kunnr.
+        CONCATENATE wa_kna1-name1 wa_kna1-name2 INTO wa_print-name1 SEPARATED BY space.
+
+        CLEAR wa_cdhdr.
+        READ TABLE t_cdhdr INTO wa_cdhdr WITH KEY objectid = wa_print-kunnr.
+        wa_print-udate = wa_cdhdr-udate.
+        wa_print-utime = wa_cdhdr-utime.
+
+        CLEAR wa_dfkkbptaxnum.
+        READ TABLE t_dfkkbptaxnum INTO wa_dfkkbptaxnum WITH KEY partner = wa_print-kunnr.
+        wa_print-taxtype = wa_dfkkbptaxnum-taxtype.
+        wa_print-taxnum = wa_dfkkbptaxnum-taxnum.
+
+        CLEAR wa_ausp.
+        READ TABLE t_ausp INTO wa_ausp WITH KEY objek = wa_print-kunnr.
+        wa_print-atwrt = wa_ausp-atwrt.
+
+        CLEAR wa_but000.
+        READ TABLE t_but000 INTO wa_but000 WITH KEY partner = wa_print-kunnr.
+        wa_print-bu_sort1 = wa_but000-bu_sort1.
+        wa_print-bu_sort2 = wa_but000-bu_sort2.
+
+        wa_print-udate = sy-datum.
+
+        CONCATENATE sy-uzeit+0(2) ':' sy-uzeit+2(2) ':' sy-uzeit+4(2) INTO wa_print-utime.
+
+        MODIFY t_print FROM wa_print.
+        CLEAR wa_print.
+    ENDLOOP.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form output_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM output_data .
+    LOOP AT t_print INTO wa_print.
+
+        IF wa_print IS INITIAL.
+            wa_print = ' '.
+        ENDIF.
+
+        TRY.
+            EXEC SQL.
+                SELECT  m_RETURN_CODE
+                  FROM SAP_KNA1
+                  INTO :wa_print-status_back
+                  WHERE m_KUNNR = :wa_print-kunnr
+                  AND m_VKORG = :wa_print-vkorg
+                  AND m_SPART = :wa_print-spart
+            ENDEXEC.
+        CATCH cx_sy_native_sql_error INTO exc_ref.
+              error_text = exc_ref->get_text( ).
+              wa_print-status_back = 'ER'.
+        ENDTRY.
+
+        IF wa_print-status_back = 'IP'.
+            wa_print-error_message = text-004.
+            EXIT.
+        ENDIF.
+
+        TRY.
+            CLEAR wa_print-status_no.
+            wa_print-status_no = '2'.
+            EXEC SQL.
+                UPDATE SAP_KNA1
+                  SET   m_BU_GROUP = CASE
+                                        WHEN :WA_PRINT-KTOKD <> ' ' THEN :WA_PRINT-KTOKD
+                                        ELSE ' '
+                                      END,
+                        m_BU_GROUP_NAME = CASE
+                                            WHEN :WA_PRINT-TXT30 <> ' ' THEN :WA_PRINT-TXT30
+                                            ELSE ' '
+                                          END,
+                        m_KUNNR = CASE
+                                    WHEN :WA_PRINT-KUNNR <> ' ' THEN :WA_PRINT-KUNNR
+                                    ELSE ' '
+                                  END,
+                        m_NAME = CASE
+                                     WHEN :WA_PRINT-NAME1 <> ' ' THEN :WA_PRINT-NAME1
+                                     ELSE ' '
+                                 END,
+                        m_BUKRS = CASE
+                                    WHEN :WA_PRINT-BUKRS <> ' ' THEN :WA_PRINT-BUKRS
+                                    ELSE ' '
+                                  END,
+                        m_VKORG = CASE
+                                    WHEN :WA_PRINT-VKORG <> ' ' THEN :WA_PRINT-VKORG
+                                    ELSE ' '
+                                  END,
+                        m_SPART = CASE
+                                    WHEN :WA_PRINT-SPART <> ' ' THEN :WA_PRINT-SPART
+                                    ELSE ' '
+                                  END,
+                        m_BZIRK = CASE
+                                    WHEN :WA_PRINT-BZIRK <> ' ' THEN :WA_PRINT-BZIRK
+                                    ELSE ' '
+                                  END,
+                        m_BZIRK_NAME = CASE
+                                        WHEN :WA_PRINT-BZTXT <> ' ' THEN :WA_PRINT-BZTXT
+                                        ELSE ' '
+                                      END,
+                        m_KDGRP = CASE
+                                    WHEN :WA_PRINT-KDGRP <> ' ' THEN :WA_PRINT-KDGRP
+                                    ELSE ' '
+                                  END,
+                        m_KDGRP_NAME = CASE
+                                         WHEN :WA_PRINT-KTEXT <> ' ' THEN :WA_PRINT-KTEXT
+                                         ELSE ' '
+                                       END,
+                        m_VKBUR = CASE
+                                    WHEN :WA_PRINT-VKBUR <> ' ' THEN :WA_PRINT-VKBUR
+                                    ELSE ' '
+                                  END,
+                        m_VKBUR_NAME = CASE
+                                        WHEN :WA_PRINT-BEZEI <> ' ' THEN :WA_PRINT-BEZEI
+                                        ELSE ' '
+                                      END,
+                        m_ZTERM = CASE
+                                    WHEN :WA_PRINT-ZTERM <> ' ' THEN :WA_PRINT-ZTERM
+                                    ELSE ' '
+                                  END,
+                        m_INCO1 = CASE
+                                    WHEN :WA_PRINT-INCO1 <> ' ' THEN :WA_PRINT-INCO1
+                                    ELSE ' '
+                                  END,
+                        m_KALKS = CASE
+                                    WHEN :WA_PRINT-KALKS <> ' ' THEN :WA_PRINT-KALKS
+                                    ELSE ' '
+                                  END,
+                        m_WAERS = CASE
+                                    WHEN :WA_PRINT-WAERS <> ' ' THEN :WA_PRINT-WAERS
+                                    ELSE ' '
+                                  END,
+                        m_TAXKD = CASE
+                                    WHEN :WA_PRINT-TAXKD <> ' ' THEN :WA_PRINT-TAXKD
+                                    ELSE ' '
+                                  END,
+                        m_KONDA = CASE
+                                    WHEN :WA_PRINT-KONDA <> ' ' THEN :WA_PRINT-KONDA
+                                    ELSE ' '
+                                  END,
+                        m_PLTYP = CASE
+                                    WHEN :WA_PRINT-PLTYP <> ' ' THEN :WA_PRINT-PLTYP
+                                    ELSE ' '
+                                  END,
+                        m_PSPRICE = CASE
+                                      WHEN :WA_PRINT-PSPRICE <> ' ' THEN :WA_PRINT-PSPRICE
+                                      ELSE ' '
+                                    END,
+                        m_BU_SORT1_TXT = CASE
+                                           WHEN :WA_PRINT-BU_SORT1 <> ' ' THEN :WA_PRINT-BU_SORT1
+                                           ELSE ' '
+                                         END,
+                        m_BU_SORT2_TXT = CASE
+                                           WHEN :WA_PRINT-BU_SORT2 <> ' ' THEN :WA_PRINT-BU_SORT2
+                                           ELSE ' '
+                                         END,
+                        m_POST_CODE1 = CASE
+                                         WHEN :WA_PRINT-PSTLZ <> ' ' THEN :WA_PRINT-PSTLZ
+                                         ELSE ' '
+                                       END,
+                        m_ADDSC = CASE
+                                    WHEN :WA_PRINT-ADDR <> ' ' THEN :WA_PRINT-ADDR
+                                    ELSE ' '
+                                  END,
+                        m_COUNTRY = CASE
+                                      WHEN :WA_PRINT-LAND1 <> ' ' THEN :WA_PRINT-LAND1
+                                      ELSE ' '
+                                    END,
+                        m_TEL_NUMBER = CASE
+                                        WHEN :WA_PRINT-TEL_NUMBER1 <> ' ' THEN :WA_PRINT-TEL_NUMBER1
+                                        ELSE ' '
+                                      END,
+                        m_TEL_EXTENS = CASE
+                                         WHEN :WA_PRINT-TEL_EXTENS <> ' ' THEN :WA_PRINT-TEL_EXTENS
+                                         ELSE ' '
+                                       END,
+                        m_MOB_NUMBER = CASE
+                                         WHEN :WA_PRINT-TEL_NUMBER2 <> ' ' THEN :WA_PRINT-TEL_NUMBER2
+                                         ELSE ' '
+                                       END,
+                        m_FAX_NUMBER = CASE
+                                          WHEN :WA_PRINT-TELFX <> ' ' THEN :WA_PRINT-TELFX
+                                          ELSE ' '
+                                        END,
+                        m_SMTP_ADDR = CASE
+                                        WHEN :WA_PRINT-SMTP_ADDR <> ' ' THEN :WA_PRINT-SMTP_ADDR
+                                        ELSE ' '
+                                      END,
+                        m_TAXTYPE = CASE
+                                      WHEN :WA_PRINT-TAXTYPE <> ' ' THEN :WA_PRINT-TAXTYPE
+                                      ELSE ' '
+                                    END,
+                        m_TAXNUMXL = CASE
+                                       WHEN :WA_PRINT-TAXNUM <> ' ' THEN :WA_PRINT-TAXNUM
+                                       ELSE ' '
+                                     END,
+                        m_ACCOUNTID = CASE
+                                       WHEN :WA_PRINT-ATWRT <> ' ' THEN :WA_PRINT-ATWRT
+                                       ELSE ' '
+                                     END,
+                        m_BP_STATUS = CASE
+                                        WHEN :WA_PRINT-STATUS_NO <> ' ' THEN :WA_PRINT-STATUS_NO
+                                        ELSE ' '
+                                      END,
+                        m_PROCESS_DATE = CASE
+                                           WHEN :WA_PRINT-UDATE <> ' ' THEN :WA_PRINT-UDATE
+                                           ELSE ' '
+                                         END,
+                        m_PROCESS_TIME = CASE
+                                           WHEN :WA_PRINT-UTIME <> ' ' THEN :WA_PRINT-UTIME
+                                           ELSE ' '
+                                         END,
+                        m_RETURN_CODE = CASE
+                                          WHEN :WA_PRINT-STATUS_BACK <> ' ' THEN :WA_PRINT-STATUS_BACK
+                                          ELSE ' '
+                                        END,
+                        m_RETURN_MESSAGE = CASE
+                                             WHEN :WA_PRINT-ERROR_MESSAGE <> ' ' THEN :WA_PRINT-ERROR_MESSAGE
+                                             ELSE ' '
+                                           END,
+                        m_RETURN_MESSAGE1 = CASE
+                                              WHEN :WA_PRINT-ERROR_MESSAGE1 <> ' ' THEN :WA_PRINT-ERROR_MESSAGE1
+                                              ELSE ' '
+                                            END,
+                        m_VTWEG = CASE
+                                    WHEN :WA_PRINT-VTWEG <> ' ' THEN :WA_PRINT-VTWEG
+                                    ELSE ' '
+                                  END,
+                        m_KVGR1 = CASE
+                                    WHEN :WA_PRINT-KVGR1 <> ' ' THEN :WA_PRINT-KVGR1
+                                    ELSE ' '
+                                  END,
+                        m_KVGR2 = CASE
+                                    WHEN :WA_PRINT-KVGR2 <> ' ' THEN :WA_PRINT-KVGR2
+                                    ELSE ' '
+                                  END,
+                        m_KVGR3 = CASE
+                                    WHEN :WA_PRINT-KVGR3 <> ' ' THEN :WA_PRINT-KVGR3
+                                    ELSE ' '
+                                  END,
+                        m_KVGR4 = CASE
+                                    WHEN :WA_PRINT-KVGR4 <> ' ' THEN :WA_PRINT-KVGR4
+                                    ELSE ' '
+                                  END,
+                        m_KVGR5 = CASE
+                                    WHEN :WA_PRINT-KVGR5 <> ' ' THEN :WA_PRINT-KVGR5
+                                    ELSE ' '
+                                  END
+                       WHERE m_KUNNR = :wa_print-kunnr
+                        AND m_VKORG = :wa_print-vkorg
+                        AND m_SPART = :wa_print-spart
+                        AND m_VTWEG = :wa_print-vtweg
+            ENDEXEC.
+            IF sy-subrc = 0.
+                w_suc = w_suc + 1.
+                PERFORM write_log USING 'C' ' '.
+                EXEC SQL.
+                    COMMIT
+                ENDEXEC.
+            ELSE.
+                CLEAR wa_print-status_no.
+                wa_print-status_no = '1'.
+                EXEC SQL.
+                    INSERT INTO SAP_KNA1 VALUES (
+                        CASE
+                          WHEN :WA_PRINT-KTOKD <> ' ' THEN :WA_PRINT-KTOKD
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-TXT30 <> ' ' THEN :WA_PRINT-TXT30
+                          ELSE ' '
+                        END,
+                       CASE
+                          WHEN :WA_PRINT-KUNNR <> ' ' THEN :WA_PRINT-KUNNR
+                          ELSE ' '
+                        END,
+                        CASE
+                            WHEN :WA_PRINT-NAME1 <> ' ' THEN :WA_PRINT-NAME1
+                            ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-BUKRS <> ' ' THEN :WA_PRINT-BUKRS
+                          ELSE ' '
+                        END,
+                         CASE
+                            WHEN :WA_PRINT-VKORG <> ' ' THEN :WA_PRINT-VKORG
+                            ELSE ' '
+                          END,
+                        CASE
+                          WHEN :WA_PRINT-SPART <> ' ' THEN :WA_PRINT-SPART
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-BZIRK <> ' ' THEN :WA_PRINT-BZIRK
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-BZTXT <> ' ' THEN :WA_PRINT-BZTXT
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-KDGRP <> ' ' THEN :WA_PRINT-KDGRP
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-KTEXT <> ' ' THEN :WA_PRINT-KTEXT
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-VKBUR <> ' ' THEN :WA_PRINT-VKBUR
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-BEZEI <> ' ' THEN :WA_PRINT-BEZEI
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-ZTERM <> ' ' THEN :WA_PRINT-ZTERM
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-INCO1 <> ' ' THEN :WA_PRINT-INCO1
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-KALKS <> ' ' THEN :WA_PRINT-KALKS
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-WAERS <> ' ' THEN :WA_PRINT-WAERS
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-TAXKD <> ' ' THEN :WA_PRINT-TAXKD
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-KONDA <> ' ' THEN :WA_PRINT-KONDA
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-PLTYP <> ' ' THEN :WA_PRINT-PLTYP
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-PSPRICE <> ' ' THEN :WA_PRINT-PSPRICE
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-BU_SORT1 <> ' ' THEN :WA_PRINT-BU_SORT1
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-BU_SORT2 <> ' ' THEN :WA_PRINT-BU_SORT2
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-PSTLZ <> ' ' THEN :WA_PRINT-PSTLZ
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-ADDR <> ' ' THEN :WA_PRINT-ADDR
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-LAND1 <> ' ' THEN :WA_PRINT-LAND1
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-TEL_NUMBER1 <> ' ' THEN :WA_PRINT-TEL_NUMBER1
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-TEL_EXTENS <> ' ' THEN :WA_PRINT-TEL_EXTENS
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-TEL_NUMBER2 <> ' ' THEN :WA_PRINT-TEL_NUMBER2
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-TELFX <> ' ' THEN :WA_PRINT-TELFX
+                          ELSE ' '
+                        END,
+                       CASE
+                          WHEN :WA_PRINT-SMTP_ADDR <> ' ' THEN :WA_PRINT-SMTP_ADDR
+                          ELSE ' '
+                        END,
+                       CASE
+                          WHEN :WA_PRINT-TAXTYPE <> ' ' THEN :WA_PRINT-TAXTYPE
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-TAXNUM <> ' ' THEN :WA_PRINT-TAXNUM
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-ATWRT <> ' ' THEN :WA_PRINT-ATWRT
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-STATUS_NO <> ' ' THEN :WA_PRINT-STATUS_NO
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-UDATE <> ' ' THEN :WA_PRINT-UDATE
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-UTIME <> ' ' THEN :WA_PRINT-UTIME
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-STATUS_BACK <> ' ' THEN :WA_PRINT-STATUS_BACK
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-ERROR_MESSAGE <> ' ' THEN :WA_PRINT-ERROR_MESSAGE
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-ERROR_MESSAGE1 <> ' ' THEN :WA_PRINT-ERROR_MESSAGE1
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-VTWEG <> ' ' THEN :WA_PRINT-VTWEG
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-KVGR1 <> ' ' THEN :WA_PRINT-KVGR1
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-KVGR2 <> ' ' THEN :WA_PRINT-KVGR2
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-KVGR3 <> ' ' THEN :WA_PRINT-KVGR3
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-KVGR4 <> ' ' THEN :WA_PRINT-KVGR4
+                          ELSE ' '
+                        END,
+                        CASE
+                          WHEN :WA_PRINT-KVGR5 <> ' ' THEN :WA_PRINT-KVGR5
+                          ELSE ' '
+                        END
+
+                    )
+                ENDEXEC.
+                IF sy-subrc = 0.
+                    w_suc = w_suc + 1.
+                    PERFORM write_log USING 'C' ' '.
+                    EXEC SQL.
+                        COMMIT
+                    ENDEXEC.
+                ELSE.
+                    MESSAGE s564(zsd) INTO error_text.
+                ENDIF.
+            ENDIF.
+        CATCH cx_sy_native_sql_error INTO exc_ref.
+              error_text = exc_ref->get_text( ).
+              WRITE: / error_text, wa_print-kunnr.
+*              stop.
+              w_err = w_err + 1.
+              PERFORM write_log USING 'E' error_text.
+        ENDTRY.
+        w_all = w_all + 1.
+    ENDLOOP.
+    WRITE: / text-002,(5) w_suc COLOR 2,
+             text-003, w_err COLOR 3,
+             text-001 ,(5) w_all COLOR 4.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form acess_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM access_data .
+    "確認權限
+    SELECT * FROM tvta INTO TABLE t_tvta
+        WHERE vkorg IN p_vkorg2 AND spart IN p_spart2.
+    LOOP AT t_tvta INTO wa_tvta.
+        AUTHORITY-CHECK OBJECT 'V_VBAK_VKO'
+                 ID 'VKORG' FIELD wa_tvta-vkorg
+                 ID 'VTWEG' FIELD wa_tvta-vtweg
+                 ID 'SPART' FIELD wa_tvta-spart
+                 ID 'ACTVT' DUMMY."FIELD '03'.
+        IF sy-subrc NE 0.
+            DELETE t_tvta.
+        ENDIF.
+    ENDLOOP.
+    IF t_tvta IS INITIAL.
+        STOP.
+    ENDIF.
+
+    READ TABLE s_kunnr2 INDEX 1.
+    IF s_erdat[] IS INITIAL.
+        s_erdat-low = '00000000'.
+        s_erdat-high = '99991231'.
+    ENDIF.
+    TRY .
+        EXEC SQL.
+            OPEN db1 FOR
+                SELECT  m_BU_GROUP,
+                        m_BU_GROUP_NAME,
+                        m_KUNNR,
+                        m_NAME,
+                        m_BUKRS,
+                        m_VKORG,
+                        m_SPART,
+                        m_BZIRK,
+                        m_BZIRK_NAME,
+                        m_KDGRP,
+                        m_KDGRP_NAME,
+                        m_VKBUR,
+                        m_VKBUR_NAME,
+                        m_ZTERM,
+                        m_INCO1,
+                        m_KALKS,
+                        m_WAERS,
+                        m_TAXKD,
+                        m_KONDA,
+                        m_PLTYP,
+                        m_PSPRICE,
+                        m_BU_SORT1_TXT,
+                        m_BU_SORT2_TXT,
+                        m_POST_CODE1,
+                        m_ADDSC,
+                        m_COUNTRY,
+                        m_TEL_NUMBER,
+                        m_TEL_EXTENS,
+                        m_MOB_NUMBER,
+                        m_FAX_NUMBER,
+                        m_SMTP_ADDR,
+                        m_TAXTYPE,
+                        m_TAXNUMXL,
+                        m_ACCOUNTID,
+                        m_BP_STATUS,
+                        m_PROCESS_DATE,
+                        m_PROCESS_TIME,
+                        m_RETURN_CODE,
+                        m_RETURN_MESSAGE,
+                        m_RETURN_MESSAGE1,
+                        m_VTWEG,
+                        m_KVGR1,
+                        m_KVGR2,
+                        m_KVGR3,
+                        m_KVGR4,
+                        m_KVGR5
+
+                        FROM SAP_KNA1
+                        WHERE (m_PROCESS_DATE BETWEEN (:s_erdat-low) AND (:s_erdat-high))
+        ENDEXEC.
+        DO.
+            EXEC SQL.
+                FETCH NEXT db1 INTO
+                      :wa_data-ktokd,
+                      :wa_data-txt30,
+                      :wa_data-kunnr,
+                      :wa_data-name1,
+                      :wa_data-bukrs,
+                      :wa_data-vkorg,
+                      :wa_data-spart,
+                      :wa_data-bzirk,
+                      :wa_data-bztxt,
+                      :wa_data-kdgrp,
+                      :wa_data-ktext,
+                      :wa_data-vkbur,
+                      :wa_data-bezei,
+                      :wa_data-zterm,
+                      :wa_data-inco1,
+                      :wa_data-kalks,
+                      :wa_data-waers,
+                      :wa_data-taxkd,
+                      :wa_data-konda,
+                      :wa_data-pltyp,
+                      :wa_data-psprice,
+                      :wa_data-bu_sort1,
+                      :wa_data-bu_sort2,
+                      :wa_data-pstlz,
+                      :wa_data-addr,
+                      :wa_data-land1,
+                      :wa_data-tel_number1,
+                      :wa_data-tel_extens,
+                      :wa_data-tel_number2,
+                      :wa_data-telfx,
+                      :wa_data-smtp_addr,
+                      :wa_data-taxtype,
+                      :wa_data-taxnum,
+                      :wa_data-atwrt,
+                      :wa_data-status_no,
+                      :wa_data-udate,
+                      :wa_data-utime,
+                      :wa_data-status_back,
+                      :wa_data-error_message,
+                      :wa_data-error_message1,
+                      :wa_data-vtweg,
+                      :wa_data-kvgr1,
+                      :wa_data-kvgr2,
+                      :wa_data-kvgr3,
+                      :wa_data-kvgr4,
+                      :wa_data-kvgr5
+            ENDEXEC.
+            IF sy-subrc <> 0.
+                EXIT.
+            ELSE.
+                IF wa_data-kunnr IN s_kunnr2 AND wa_data-spart IN p_spart2
+                   AND wa_data-status_back IN s_status AND wa_data-vkorg IN p_vkorg2.
+                    APPEND wa_data TO t_data.
+                    CLEAR: wa_data.
+                ENDIF.
+            ENDIF.
+        ENDDO.
+        EXEC SQL.
+            CLOSE db1
+        ENDEXEC.
+    CATCH cx_sy_native_sql_error INTO exc_ref.
+          error_text = exc_ref->get_text( ).
+    ENDTRY.
+
+    SORT t_data BY kunnr.
+    DESCRIBE TABLE t_data LINES w_lines.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form connect
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM connect .
+    CLEAR error_text.
+
+    SELECT SINGLE alpvl INTO w_system FROM zutm10 WHERE sysvr = 'UT_DB'.
+
+    IF sy-subrc <> 0.
+        MESSAGE e114(smi_general) INTO error_text.
+    ENDIF.
+
+    TRY .
+        EXEC SQL.
+            CONNECT TO :w_system
+        ENDEXEC.
+        w_success_con = 'X'.
+    CATCH cx_sy_native_sql_error INTO exc_ref.
+           error_text = exc_ref->get_text( ).
+           w_success_con = space.
+           MESSAGE error_text TYPE 'I'.
+    ENDTRY.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form disconnect
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM disconnect .
+    CLEAR error_text.
+    IF w_success_con = 'X'.
+        TRY .
+            EXEC SQL.
+                DISCONNECT :w_system
+            ENDEXEC.
+        CATCH cx_sy_native_sql_error INTO exc_ref.
+              error_text = exc_ref->get_text( ).
+              MESSAGE error_text TYPE 'I'.
+        ENDTRY.
+        CLEAR w_success_con.
+    ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form GET_COMPONENT_LIST
+*&---------------------------------------------------------------------*
+FORM get_component_list  USING VALUE(l_tabname)
+                         CHANGING lt_component LIKE t_component[].
+    CALL FUNCTION 'GET_COMPONENT_LIST'
+      EXPORTING
+        program          = sy-cprog
+        fieldname        = l_tabname
+      TABLES
+        components       = lt_component.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form GET_LONG_TEXT
+*&---------------------------------------------------------------------*
+FORM get_long_text  TABLES   t_component STRUCTURE rstrucinfo
+                    USING    wa_main  text
+                    CHANGING ltext.
+    DATA: l_num     TYPE i,
+          l_text    TYPE string,
+          l_quan15  TYPE c LENGTH 15,
+          l_err     TYPE c LENGTH 500.
+    FIELD-SYMBOLS <l_field>.
+
+    ltext = text.
+
+    LOOP AT t_component INTO wa_component.
+        ADD 1 TO l_num.
+        l_text = l_num.
+        CONCATENATE '&' l_text INTO l_text.
+        CONDENSE l_text NO-GAPS.
+        ASSIGN COMPONENT wa_component-compname OF STRUCTURE wa_main TO <l_field>.
+        IF <l_field> IS ASSIGNED.
+            IF wa_component-type = 'P'.
+                l_quan15 = <l_field>.
+                REPLACE l_text INTO ltext WITH l_quan15.
+            ELSE.
+                REPLACE l_text INTO ltext WITH <l_field>.
+            ENDIF.
+        ENDIF.
+        CLEAR: l_quan15, wa_component.
+    ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form WRITE_LOG
+*&---------------------------------------------------------------------*
+FORM write_log  USING   status   message.
+    DATA: lwa_zutt01  TYPE zutt01,
+          l_objectid  TYPE zutt01-objectid,
+          l_serial_no TYPE zutt01-serial_no.
+    DATA: c_tcode TYPE zutt01-tcode,
+          w_mode TYPE zutt01-zmode,
+          w_datum TYPE zutt01-process_date,
+          w_uzeit TYPE zutt01-process_time,
+          w_cond TYPE zutt01-zcondition,
+          w_ltext2 TYPE string.
+
+    c_tcode = 'ZSD6A'.
+    w_datum = sy-datum.
+    w_uzeit = sy-uzeit.
+    w_cond = 'X'.
+
+
+    IF sy-batch IS NOT INITIAL.
+        w_mode = 'D'.
+    ELSE.
+        w_mode = 'W'.
+    ENDIF.
+
+    CONCATENATE wa_print-kunnr wa_print-vkorg wa_print-spart INTO l_objectid.
+    lwa_zutt01-mandt          = sy-mandt.
+    lwa_zutt01-tcode          = c_tcode.
+    lwa_zutt01-zmode          = w_mode.
+    lwa_zutt01-objectid       = l_objectid.
+    SELECT SINGLE MAX( serial_no ) INTO l_serial_no FROM zutt01 WHERE tcode = c_tcode AND objectid = l_objectid.
+    ADD 1 TO l_serial_no.
+    lwa_zutt01-serial_no      = l_serial_no.
+    lwa_zutt01-process_date   = w_datum.
+    lwa_zutt01-process_time   = w_uzeit.
+    lwa_zutt01-process_user   = sy-uname.
+    lwa_zutt01-zcondition     = w_cond.
+    CONCATENATE sy-datum sy-uzeit INTO lwa_zutt01-update_date SEPARATED BY space.
+    lwa_zutt01-update_user    = sy-uname.
+
+    PERFORM get_long_text TABLES t_component2
+                          USING wa_print w_ltext2
+                          CHANGING lwa_zutt01-ltext.
+    IF status = 'C'.
+            lwa_zutt01-update_status = 'C'.
+    ELSE.
+        lwa_zutt01-update_status  = 'E'.
+        lwa_zutt01-err_message    = message.
+    ENDIF.
+    MODIFY zutt01 FROM lwa_zutt01.
+    CLEAR: lwa_zutt01.
+
+ENDFORM.
