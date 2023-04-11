@@ -1,14 +1,14 @@
-REPORT 506 MESSAGE-ID zsd.
+REPORT SDREPORT MESSAGE-ID zsd.
 ************************************************************************
-* Description  : 客戶資料上傳與查詢CDB
+* Description  : 資料上傳與查詢CDB
 ************************************************************************
-INCLUDE zrsdsd506top.
-INCLUDE zrsdsd506f99.
+INCLUDE top.
+INCLUDE ALVfunction.
 ***********************************************************************
 * INITIALIZATION
 ***********************************************************************
 INITIALIZATION.
-   "預設值給user-id
+   "Default value user-id
     SELECT bname parid parva FROM usr05 INTO CORRESPONDING FIELDS OF TABLE t_usr05
       WHERE bname = sy-uname.
 
@@ -95,7 +95,7 @@ END-OF-SELECTION.
 *& <--  p2        text
 *&---------------------------------------------------------------------*
 FORM read_data .
-  "確認權限
+  "Check authority
     SELECT * FROM tvta INTO TABLE t_tvta
         WHERE vkorg = p_vkorg AND spart IN p_spart.
     LOOP AT t_tvta INTO wa_tvta.
@@ -135,7 +135,7 @@ FORM read_data .
       ON a~atinn = c~atinn
       WHERE c~atnam = 'Z_SD_BP_ID'.
 
-    "主資料
+    "Header
     IF p_upload = 'X'.
         SELECT a~ktokd a~kunnr a~stcd1 v~vkorg v~spart v~bzirk v~kdgrp v~vkbur v~zterm v~inco1 v~kalks v~waers
           a~adrnr a~pstlz a~pstlz a~land1 a~telfx a~erdat v~konda v~pltyp v~zz1_psprice_csa AS psprice v~vtweg
@@ -164,14 +164,14 @@ FORM read_data .
           WHERE partner = t_print-kunnr.
     ENDIF.
 
-    "抓Change Log
+    "Catch Change Log
     IF t_print IS NOT INITIAL.
         SELECT objectid udate utime INTO CORRESPONDING FIELDS OF TABLE t_cdhdr
           FROM cdhdr
           WHERE tcode = 'BP'.
     ENDIF.
 
-    "只要抓最新的日期與時間
+    "Only Get the newest Data
     SORT t_cdhdr BY udate utime DESCENDING.
     DELETE ADJACENT DUPLICATES FROM t_cdhdr COMPARING objectid.
 
@@ -216,23 +216,23 @@ FORM read_data .
           WHERE kunnr = t_print-kunnr.
     ENDIF.
 
-    "地址結合
+    "Combination of the address
     LOOP AT t_kna1 INTO wa_kna1.
         CONCATENATE wa_kna1-name1 wa_kna1-name2 INTO wa_kna1-name1 SEPARATED BY space.
     ENDLOOP.
 
-    PERFORM get_desc.
+    PERFORM organize_data.
 
 ENDFORM.
 *&---------------------------------------------------------------------*
-*& Form get_desc
+*& Form organize_data
 *&---------------------------------------------------------------------*
 *& text
 *&---------------------------------------------------------------------*
 *& -->  p1        text
 *& <--  p2        text
 *&---------------------------------------------------------------------*
-FORM get_desc .
+FORM organize_data.
     CLEAR: wa_print.
     LOOP AT t_print INTO wa_print.
 
