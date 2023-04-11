@@ -1,0 +1,248 @@
+*&---------------------------------------------------------------------*
+*& INCLUDE       TOP
+*&---------------------------------------------------------------------*
+TABLES: kna1, knvv.
+TYPE-POOLS slis.
+
+DATA: t_component LIKE STANDARD TABLE OF rstrucinfo,
+      t_component2 LIKE STANDARD TABLE OF rstrucinfo,
+      wa_component LIKE rstrucinfo,
+      wa_component2 LIKE rstrucinfo.
+
+"ALV Components
+DATA: t_fieldcat    TYPE lvc_t_fcat,
+      wa_fieldcat    TYPE lvc_s_fcat,
+*      i_fieldcat    TYPE slis_t_fieldcat_alv,
+      t_sortable    TYPE lvc_t_sort,
+      gs_layout      TYPE lvc_s_layo,
+      w_settings    TYPE lvc_s_glay,
+      t_top_of_page TYPE slis_t_listheader,
+      w_top_of_page LIKE LINE OF t_top_of_page,
+      t_events      TYPE slis_t_event,
+      w_event       LIKE LINE OF t_events,
+      i_events      TYPE slis_t_event,
+
+      ls_stylerow TYPE lvc_s_styl,
+      lt_styletab TYPE lvc_t_styl,
+      wa_sortable TYPE lvc_s_sort.
+
+"單一值
+DATA: w_system(20),
+      w_success_con TYPE c,
+      w_suc TYPE i,
+      w_err TYPE i,
+      w_all TYPE i.
+
+"錯誤訊息
+DATA: exc_ref    TYPE REF TO cx_sy_native_sql_error,
+      error_text TYPE string.
+
+"傳送資料
+DATA: BEGIN OF wa_print,
+        ktokd TYPE kna1-ktokd,              "分組
+        txt30 TYPE t077x-txt30,             "分組說明
+        kunnr TYPE kna1-kunnr,              "客戶編號
+        name1 TYPE kna1-name1,              "客戶名稱
+        bukrs TYPE knb1-bukrs,              "公司代碼
+        vkorg TYPE knvv-vkorg,              "銷售組織
+        spart TYPE knvv-spart,              "部門
+        bzirk TYPE knvv-bzirk,              "課別
+        bztxt TYPE t171t-bztxt,             "課別說明
+        kdgrp TYPE knvv-kdgrp,              "客戶群組
+        ktext TYPE t151t-ktext,             "客戶群組說明
+        vkbur TYPE knvv-vkbur,              "銷售據點
+        bezei TYPE tvkbt-bezei,             "銷售據點說明
+        zterm TYPE knvv-zterm,              "付款條件
+        inco1 TYPE knvv-inco1,              "國貿條件
+        kalks TYPE knvv-kalks,              "含稅未稅
+        waers TYPE knvv-waers,              "幣別
+        taxkd TYPE knvi-taxkd,              "課稅方式
+        konda TYPE knvv-konda,              "價格群組
+        pltyp TYPE knvv-pltyp,              "價目表
+        psprice TYPE knvv-zz1_psprice_csa,  "出方籤順序
+        bu_sort1 TYPE but000-bu_sort1,              "搜尋條件一
+        bu_sort2 TYPE but000-bu_sort2,              "搜尋條件二
+        pstlz TYPE kna1-pstlz,              "郵遞區號
+        addr(50),                           "地址
+        land1 TYPE kna1-land1,              "國家代碼
+        tel_number1 TYPE adr2-tel_number,   "電話
+        tel_extens TYPE adr2-tel_extens,    "分機
+        tel_number2 TYPE adr2-tel_number,   "行動電話
+        telfx TYPE kna1-telfx,              "傳真
+        smtp_addr TYPE adr6-smtp_addr,      "電子郵件
+        taxtype TYPE dfkkbptaxnum-taxtype,  "類型
+        taxnum TYPE dfkkbptaxnum-taxnum,              "統編
+        atwrt TYPE ausp-atwrt,              "外部系統AD帳號
+        status_no(1),                       "狀態碼
+        udate TYPE cdhdr-udate,             "處理日期
+        utime(8),             "處理時間
+        status_back(30),                    "回傳狀態
+        error_message(100),                 "錯誤訊息
+        error_message1(100),
+        vtweg TYPE knvv-vtweg,
+        kvgr1 TYPE knvv-kvgr1,
+        kvgr2 TYPE knvv-kvgr2,
+        kvgr3 TYPE knvv-kvgr3,
+        kvgr4 TYPE knvv-kvgr4,
+        kvgr5 TYPE knvv-kvgr5,
+        adrnr TYPE kna1-adrnr,              "地址連接
+      END OF wa_print,
+      t_print LIKE STANDARD TABLE OF wa_print.
+
+"抓進來的資料
+DATA: BEGIN OF wa_data,
+        flag TYPE char1,
+        style  TYPE lvc_t_styl.
+        INCLUDE STRUCTURE wa_print.
+DATA: END OF wa_data,
+      t_data LIKE STANDARD TABLE OF wa_data.
+
+"要刪除的資料
+DATA: lwa_del LIKE wa_data,
+      lt_del LIKE STANDARD TABLE OF lwa_del.
+
+DATA: BEGIN OF wa_but000,
+        partner TYPE but000-partner,
+        bu_sort1 TYPE but000-bu_sort1,
+        bu_sort2 TYPE but000-bu_sort2,
+
+      END OF wa_but000,
+      t_but000 LIKE STANDARD TABLE OF wa_but000.
+
+"類別
+DATA: BEGIN OF wa_dfkkbptaxnum,
+        partner TYPE dfkkbptaxnum-partner,
+        taxtype TYPE dfkkbptaxnum-taxtype,
+        taxnum TYPE dfkkbptaxnum-taxnum,
+      END OF wa_dfkkbptaxnum,
+      t_dfkkbptaxnum LIKE STANDARD TABLE OF wa_dfkkbptaxnum.
+
+"外部系統AD帳號
+DATA: BEGIN OF wa_ausp,
+        objek TYPE ausp-objek, "KUNNR
+        atinn TYPE ausp-atinn,
+        atnam TYPE cabn-atnam,
+        atwrt TYPE ausp-atwrt,
+      END OF wa_ausp,
+      t_ausp LIKE STANDARD TABLE OF wa_ausp.
+
+"分組說明
+DATA: BEGIN OF wa_t077x,
+        ktokd TYPE t077x-ktokd,
+        txt30 TYPE t077x-txt30,
+      END OF wa_t077x,
+      t_t077x LIKE STANDARD TABLE OF wa_t077x.
+
+"抓公司
+DATA: BEGIN OF wa_knb1,
+        kunnr TYPE knb1-kunnr,
+        bukrs TYPE knb1-bukrs,
+      END OF wa_knb1,
+      t_knb1 LIKE STANDARD TABLE OF wa_knb1.
+
+"抓課稅方式
+DATA: BEGIN OF wa_knvi,
+        kunnr TYPE knvi-kunnr,
+        taxkd TYPE knvi-taxkd,
+      END OF wa_knvi,
+      t_knvi LIKE STANDARD TABLE OF wa_knvi.
+
+  "電子郵件
+DATA: BEGIN OF wa_adr6,
+        addrnumber TYPE adr6-addrnumber,
+        smtp_addr TYPE adr6-smtp_addr,
+      END OF wa_adr6,
+      t_adr6 LIKE STANDARD TABLE OF wa_adr6.
+
+"ADRC地址
+DATA: BEGIN OF wa_adrc,
+        addrnumber TYPE adrc-addrnumber,
+        city1 TYPE adrc-city1,
+        street TYPE adrc-street,
+      END OF wa_adrc,
+      t_adrc LIKE STANDARD TABLE OF wa_adrc.
+
+"抓手機號碼 => r3_user 等於 3 時就是行動電話
+DATA: BEGIN OF wa_adr2,
+        addrnumber TYPE adr2-addrnumber,
+        tel_number TYPE adr2-tel_number,
+        tel_extens TYPE adr2-tel_extens,
+        r3_user TYPE adr2-r3_user,
+      END OF wa_adr2,
+      t_adr2 LIKE STANDARD TABLE OF wa_adr2.
+
+"抓課別說明
+DATA: BEGIN OF wa_t171t,
+        bzirk TYPE t171t-bzirk,
+        bztxt TYPE t171t-bztxt,
+      END OF wa_t171t,
+      t_t171t LIKE STANDARD TABLE OF wa_t171t.
+
+"客戶群組說明
+DATA: BEGIN OF wa_t151t,
+        kdgrp TYPE t151t-kdgrp,
+        ktext TYPE t151t-ktext,
+      END OF wa_t151t,
+      t_t151t LIKE STANDARD TABLE OF wa_t151t.
+
+"抓銷售據點說明
+DATA: BEGIN OF wa_tvkbt,
+        vkbur TYPE tvkbt-vkbur,
+        bezei TYPE tvkbt-bezei,
+      END OF wa_tvkbt,
+      t_tvkbt LIKE STANDARD TABLE OF wa_tvkbt.
+
+DATA: BEGIN OF wa_kna1,
+        kunnr TYPE kna1-kunnr,
+        name1 TYPE kna1-name1,
+        name2 TYPE kna1-name2,
+      END OF wa_kna1,
+      t_kna1 LIKE STANDARD TABLE OF wa_kna1.
+
+"User-id 的預設
+DATA: BEGIN OF wa_usr05,
+        bname TYPE usr05-bname,
+        parid TYPE usr05-parid,
+        parva TYPE usr05-parva,
+      END OF wa_usr05,
+      t_usr05 LIKE STANDARD TABLE OF wa_usr05.
+
+     "抓增修日期
+DATA: wa_cdhdr LIKE cdhdr,
+      t_cdhdr LIKE STANDARD TABLE OF cdhdr,
+      wa_cdpos LIKE cdpos,
+      t_cdpos LIKE STANDARD TABLE OF cdpos.
+"權限
+DATA: t_tvta  LIKE STANDARD TABLE OF tvta,
+      wa_tvta LIKE tvta.
+"寫LOG
+DATA: wa_zutm10 LIKE zutm10,
+      t_zutm10 LIKE STANDARD TABLE OF zutm10.
+
+DATA: wa_prv        LIKE wa_print,
+      w_auth(1),
+      w_lines(10),
+      w_lines_i(10).
+***********************************************************************
+* Selection Screen / Option / Parameter
+***********************************************************************
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT (32) TEXT-r03.
+PARAMETERS p_upload RADIOBUTTON GROUP rad DEFAULT 'X' USER-COMMAND a.
+SELECTION-SCREEN COMMENT (24) TEXT-r01.
+PARAMETERS p_search RADIOBUTTON GROUP rad.
+SELECTION-SCREEN COMMENT (24) TEXT-r02.
+SELECTION-SCREEN END OF LINE.
+
+"上傳模式
+PARAMETERS p_vkorg TYPE knvv-vkorg MODIF ID g1.
+SELECT-OPTIONS p_spart FOR knvv-spart NO INTERVALS NO-EXTENSION MODIF ID g1.
+SELECT-OPTIONS: s_datum FOR sy-datum DEFAULT sy-datum MODIF ID g1 OBLIGATORY,
+                s_kunnr FOR kna1-kunnr MODIF ID g1.
+
+"查詢模式
+SELECT-OPTIONS p_vkorg2 FOR knvv-vkorg NO INTERVALS NO-EXTENSION MODIF ID g2.
+SELECT-OPTIONS p_spart2 FOR knvv-spart NO INTERVALS NO-EXTENSION MODIF ID g2.
+SELECT-OPTIONS: s_kunnr2 FOR kna1-kunnr MODIF ID g2 NO-EXTENSION,
+                s_erdat FOR kna1-erdat MODIF ID g2 NO-EXTENSION.
+SELECT-OPTIONS s_status FOR kna1-pstlz NO INTERVALS NO-EXTENSION MODIF ID g2.
