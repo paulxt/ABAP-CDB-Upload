@@ -1,0 +1,627 @@
+*&---------------------------------------------------------------------*
+*& INCLUDE          
+*&---------------------------------------------------------------------*
+FORM build_event .
+    w_event-form = w_event-name = 'TOP_OF_PAGE'.
+    APPEND w_event TO t_events.
+ENDFORM.
+FORM top_of_page.
+    CALL FUNCTION 'REUSE_ALV_COMMENTARY_WRITE'
+      EXPORTING
+*       i_logo             = 'ENJOYSAP_LOGO'
+        it_list_commentary = t_top_of_page.
+ENDFORM.                    "top_of_page
+*&---------------------------------------------------------------------*
+*&      Form  BUILD_TOP_OF_PAGE_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM build_top_of_page_data .
+    DATA: l_text(40),
+          l_fdt(10),
+          l_tdt(10).
+    REFRESH t_top_of_page.
+
+    CLEAR w_top_of_page.
+    w_top_of_page = 'H' .   " H = Header, S = Selection, A = Action
+*    w_top_of_page-info = sy-title.
+    CONCATENATE text-100 '(' w_lines ')' INTO l_text.
+    w_top_of_page-info = l_text.
+    APPEND w_top_of_page TO t_top_of_page.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  FIELDCAT_INIT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_T_FIELDCAT[]  text
+*      -->P_T_SORTABLE[]  text
+*----------------------------------------------------------------------*
+FORM fieldcat_init  USING  t_fieldcat TYPE lvc_t_fcat
+                           t_sortable TYPE lvc_t_sort.
+
+      "刪除
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'FLAG'.
+      wa_fieldcat-checkbox = 'X'.
+      wa_fieldcat-edit = 'X'.
+      wa_fieldcat-coltext = text-h36.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "分組
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname  = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KTOKD'.
+      wa_fieldcat-coltext = text-h00.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "分組說明
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'TXT30'.
+      wa_fieldcat-ref_table = 'T077X'.
+      wa_fieldcat-ref_field = 'TXT30'.
+      wa_fieldcat-coltext = text-h01.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "客戶編號
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KUNNR'.
+      wa_fieldcat-ref_table = 'KNA1'.
+      wa_fieldcat-ref_field = 'KUNNR'.
+      wa_fieldcat-coltext = text-h02.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "客戶名稱
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'NAME1'.
+      wa_fieldcat-ref_table = 'KNA1'.
+      wa_fieldcat-ref_field = 'NAME1'.
+      wa_fieldcat-coltext = text-h03.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "公司代碼
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'BUKRS'.
+      wa_fieldcat-ref_table = 'KNB1'.
+      wa_fieldcat-ref_field = 'BUKRS'.
+      wa_fieldcat-coltext = text-h04.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "銷售組織
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'VKORG'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'VKORG'.
+      wa_fieldcat-coltext = text-h05.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "部門
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'SPART'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'SPART'.
+      wa_fieldcat-coltext = text-h06.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "課別
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'BZIRK'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'BZIRK'.
+      wa_fieldcat-coltext = text-h07.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "課別說明
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'BZTXT'.
+      wa_fieldcat-coltext = text-h08.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "客戶群組
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KDGRP'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'KDGRP'.
+      wa_fieldcat-coltext = text-h09.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "客戶群組說明
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KTEXT'.
+      wa_fieldcat-ref_table = 'T151T'.
+      wa_fieldcat-ref_field = 'KTEXT'.
+      wa_fieldcat-coltext = text-h10.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "銷售據點
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'VKBUR'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'VKBUR'.
+      wa_fieldcat-coltext = text-h11.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "銷售據點說明
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'BEZEI'.
+      wa_fieldcat-ref_table = 'TVKBT'.
+      wa_fieldcat-ref_field = 'BEZEI'.
+      wa_fieldcat-coltext = text-h12.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "付款條件
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'ZTERM'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'ZTERM'.
+      wa_fieldcat-coltext = text-h13.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "國貿條件
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'INCO1'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'INCO1'.
+      wa_fieldcat-coltext = text-h14.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "含稅未稅
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KALKS'.
+      wa_fieldcat-coltext = text-h15.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "幣別
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'WAERS'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'WAERS'.
+      wa_fieldcat-coltext = text-h16.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "課稅方式
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'TAXKD'.
+      wa_fieldcat-ref_table = 'KNVI'.
+      wa_fieldcat-ref_field = 'TAXKD'.
+      wa_fieldcat-coltext = text-h17.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "價格群組
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KONDA'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'KONDA'.
+      wa_fieldcat-coltext = text-h37.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "價目表
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'TLTYP'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'TLTYP'.
+      wa_fieldcat-coltext = text-h38.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "處方箋取價順序
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'PSPRICE'.
+      wa_fieldcat-ref_table = 'KNVV'.
+      wa_fieldcat-ref_field = 'ZZ1_PSPRICE_CSA'.
+      wa_fieldcat-coltext = text-h39.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "搜尋條件一
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'BU_SORT1'.
+      wa_fieldcat-ref_table = 'BUT000'.
+      wa_fieldcat-ref_field = 'BU_SORT1'.
+      wa_fieldcat-coltext = text-h18.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "搜尋條件二
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'BU_SORT2'.
+      wa_fieldcat-ref_table = 'BUT000'.
+      wa_fieldcat-ref_field = 'BU_SORT2'.
+      wa_fieldcat-coltext = text-h19.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "郵遞區號
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'PSTLZ'.
+      wa_fieldcat-ref_table = 'KNA1'.
+      wa_fieldcat-ref_field = 'PSTLZ'.
+      wa_fieldcat-coltext = text-h20.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "地址
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'ADDR'.
+      wa_fieldcat-coltext = text-h21.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "國家代碼
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'LAND1'.
+      wa_fieldcat-ref_table = 'KNA1'.
+      wa_fieldcat-ref_field = 'LAND1'.
+      wa_fieldcat-coltext = text-h22.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "電話
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'TEL_NUMBER1'.
+      wa_fieldcat-ref_table = 'ADR2'.
+      wa_fieldcat-ref_field = 'TEL_NUMBER'.
+      wa_fieldcat-coltext = text-h23.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "分機
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'TEL_EXTENS'.
+      wa_fieldcat-ref_table = 'ADR2'.
+      wa_fieldcat-ref_field = 'EXTENS'.
+      wa_fieldcat-coltext = text-h24.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "行動電話
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'TEL_NUMBER2'.
+      wa_fieldcat-ref_table = 'ADR2'.
+      wa_fieldcat-ref_field = 'TEL_NUMBER'.
+      wa_fieldcat-coltext = text-h25.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "傳真
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'TELFX'.
+      wa_fieldcat-ref_table = 'KNA1'.
+      wa_fieldcat-ref_field = 'TELFX'.
+      wa_fieldcat-coltext = text-h26.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "電子郵件
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'SMTP_ADDR'.
+      wa_fieldcat-ref_table = 'ADR6'.
+      wa_fieldcat-ref_field = 'SMTP_ADDR'.
+      wa_fieldcat-coltext = text-h27.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "類型
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'TAXTYPE'.
+      wa_fieldcat-coltext = text-h28.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "統編
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'TAXNUM'.
+      wa_fieldcat-coltext = text-h29.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "外部系統AD帳號
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'ATWRT'.
+      wa_fieldcat-coltext = text-h30.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "狀態碼
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'STATUS_NO'.
+      wa_fieldcat-coltext = text-h31.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "處理日期
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'UDATE'.
+      wa_fieldcat-ref_table = 'CDHDR'.
+      wa_fieldcat-ref_field = 'UDATE'.
+      wa_fieldcat-coltext = text-h32.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "處理時間
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'UTIME'.
+      wa_fieldcat-ref_table = 'CDHDR'.
+      wa_fieldcat-ref_field = 'UTIME'.
+      wa_fieldcat-coltext = text-h33.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "回傳狀態
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'STATUS_BACK'.
+      wa_fieldcat-coltext = text-h34.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      "錯誤訊息
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'ERROR_MESSAGE'.
+      wa_fieldcat-coltext = text-h35.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'VTWEG'.
+      wa_fieldcat-coltext = text-h40.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KVGR1'.
+      wa_fieldcat-coltext = text-h41.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KVGR2'.
+      wa_fieldcat-coltext = text-h42.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KVGR3'.
+      wa_fieldcat-coltext = text-h43.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KVGR4'.
+      wa_fieldcat-coltext = text-h44.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+      wa_fieldcat-col_pos   = wa_fieldcat-col_pos + 1.
+      wa_fieldcat-tabname   = 'T_DATA'.
+      wa_fieldcat-fieldname = 'KVGR5'.
+      wa_fieldcat-coltext = text-h45.
+      APPEND wa_fieldcat TO t_fieldcat.
+      CLEAR wa_fieldcat.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  DISPLAY_ALV
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM display_alv .
+
+    "確認狀態值
+    LOOP AT  t_data INTO wa_data.
+        TRY.
+            EXEC SQL.
+                SELECT  m_RETURN_CODE
+                  FROM SAP_KNA1
+                  INTO :wa_data-status_back
+                  WHERE m_KUNNR = :wa_data-kunnr
+                  AND m_VKORG = :wa_data-vkorg
+                  AND m_SPART = :wa_data-spart
+            ENDEXEC.
+        CATCH cx_sy_native_sql_error INTO exc_ref.
+              error_text = exc_ref->get_text( ).
+        ENDTRY.
+
+        CLEAR : ls_stylerow, wa_data-style.
+        ls_stylerow-fieldname = 'FLAG'.
+        IF wa_data-status_back = 'IP'.
+          ls_stylerow-style = cl_gui_alv_grid=>mc_style_disabled.
+        ENDIF.
+        APPEND ls_stylerow TO wa_data-style.
+
+        MODIFY t_data FROM wa_data.
+    ENDLOOP.
+
+    gs_layout-cwidth_opt = w_settings-no_colwopt = 'X'.
+    gs_layout-stylefname = 'STYLE'.
+
+    CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY_LVC'
+     EXPORTING
+       I_CALLBACK_PROGRAM                = sy-cprog
+       I_CALLBACK_PF_STATUS_SET          = 'SET_PF_STATUS'
+       I_CALLBACK_USER_COMMAND           = 'USER_COMMAND'
+*       I_CALLBACK_TOP_OF_PAGE            = ' '
+       I_BACKGROUND_ID                   = 'ALV_BACKGROUND'
+       I_GRID_SETTINGS                   = w_settings
+       IS_LAYOUT_LVC                     = gs_layout
+       IT_FIELDCAT_LVC                   = t_fieldcat[]
+       IT_SORT_LVC                       = t_sortable[]
+       I_SAVE                            = 'A'
+       IT_EVENTS                         = t_events
+      TABLES
+        t_outtab                          = t_data
+     EXCEPTIONS
+       PROGRAM_ERROR                     = 1
+       OTHERS                            = 2.
+
+ENDFORM.
+FORM set_pf_status USING rt_extab TYPE slis_t_extab.
+    PERFORM adapt_excluding_tab IN PROGRAM saplslvc_fullscreen CHANGING rt_extab[] IF FOUND.
+    SET PF-STATUS 'ZSTANDARD_FULLSCREEN' EXCLUDING rt_extab[].
+ENDFORM.
+FORM user_command USING lv_okcode LIKE sy-ucomm l_selfield TYPE slis_selfield.
+    lv_okcode = sy-ucomm.
+    CLEAR sy-ucomm.
+    "連接外部DB
+    PERFORM connect.
+
+    "執行進成刪除
+    CASE lv_okcode.
+      WHEN '&SALL'.
+        LOOP AT t_data INTO wa_data.
+            wa_data-flag = 'X'.
+            l_selfield-refresh = 'X'.
+            MODIFY t_data FROM wa_data.
+        ENDLOOP.
+        "Refresh
+        DATA ls_ref1 TYPE REF TO cl_gui_alv_grid .
+        CALL FUNCTION 'GET_GLOBALS_FROM_SLVC_FULLSCR'
+        IMPORTING
+          e_grid = ls_ref1.
+        CALL METHOD ls_ref1->check_changed_data .
+      WHEN '&DSALL'.
+        LOOP AT t_data INTO wa_data.
+            wa_data-flag = ' '.
+            l_selfield-refresh = 'X'.
+            MODIFY t_data FROM wa_data.
+        ENDLOOP.
+        "Refresh
+        CALL FUNCTION 'GET_GLOBALS_FROM_SLVC_FULLSCR'
+        IMPORTING
+          e_grid = ls_ref1.
+        CALL METHOD ls_ref1->check_changed_data .
+      WHEN 'EXECUTE'.
+        "Refresh the table (flag賦予'X')
+*        DATA ls_ref1 TYPE REF TO cl_gui_alv_grid .
+        CALL FUNCTION 'GET_GLOBALS_FROM_SLVC_FULLSCR'
+        IMPORTING
+          e_grid = ls_ref1.
+        CALL METHOD ls_ref1->check_changed_data .
+
+        "裝入要刪除的資料
+        LOOP AT t_data INTO wa_data WHERE flag = 'X'.
+            lwa_del = wa_data.
+            CLEAR wa_data.
+            APPEND lwa_del TO lt_del.
+            CLEAR lwa_del.
+        ENDLOOP.
+        "刪除在ALV itab的資料
+        DELETE t_data WHERE flag = 'X'.
+
+        "刪除在CDB的資料
+        LOOP AT lt_del INTO lwa_del.
+            TRY .
+                EXEC SQL.
+                    DELETE FROM SAP_KNA1 WHERE m_KUNNR = :lwa_del-kunnr
+                                    AND m_VKORG = :lwa_del-vkorg
+                                    AND m_SPART = :lwa_del-spart
+                ENDEXEC.
+                EXEC SQL.
+                    COMMIT
+                ENDEXEC.
+            CATCH cx_sy_native_sql_error INTO exc_ref.
+              error_text = exc_ref->get_text( ).
+            ENDTRY.
+        ENDLOOP.
+
+        REFRESH lt_del.
+
+       "REFRESH
+        PERFORM connect.
+        REFRESH t_data.
+        PERFORM access_data.
+
+        PERFORM build_event.
+        PERFORM build_top_of_page_data.
+        PERFORM fieldcat_init USING t_fieldcat[] t_sortable.
+        PERFORM display_alv.
+
+        PERFORM disconnect.
+
+      WHEN 'REFRESH'.
+            PERFORM connect.
+            REFRESH t_data.
+            PERFORM access_data.
+
+            PERFORM build_event.
+            PERFORM build_top_of_page_data.
+            PERFORM fieldcat_init USING t_fieldcat[] t_sortable.
+            PERFORM display_alv.
+
+        PERFORM disconnect.
+      WHEN OTHERS.
+    ENDCASE.
+
+    PERFORM disconnect.
+ENDFORM.
